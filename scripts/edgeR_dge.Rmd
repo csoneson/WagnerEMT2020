@@ -1,0 +1,557 @@
+---
+title: "edgeR DGE"
+author: ""
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: yeti
+    highlight: tango
+    code_folding: show
+    keep_md: true
+references:
+- id: Robinson2010edgeR
+  title: edgeR-a Bioconductor package for differential expression analysis of digital gene expression data
+  author:
+  - family: Robinson
+    given: Mark D
+  - family: McCarthy
+    given: Davis J
+  - family: Smyth
+    given: Gordon K
+  container-title: Bioinformatics
+  volume: 26
+  page: 139-140
+  type: article-journal
+  URL: https://academic.oup.com/bioinformatics/article-lookup/doi/10.1093/bioinformatics/btp616
+  issued:
+    year: 2010
+- id: Robinson2010TMM
+  title: A scaling normalization method for differential expression analysis of RNA-seq data
+  author:
+  - family: Robinson
+    given: Mark D
+  - family: Oshlack
+    given: Alicia
+  container-title: Genome Biology
+  volume: 11
+  page: R25
+  type: article-journal
+  URL: https://genomebiology.biomedcentral.com/articles/10.1186/gb-2010-11-3-r25
+  issued:
+    year: 2010
+- id: Soneson2016tximport
+  title: Differential analyses for RNA-seq- transcript-level estimates improve gene-level inferences
+  author:
+  - family: Soneson
+    given: Charlotte
+  - family: Love
+    given: Michael I
+  - family: Robinson
+    given: Mark D
+  container-title: F1000Research
+  volume: 4
+  page: 1521
+  type: article-journal
+  URL: https://f1000research.com/articles/4-1521/v2
+  issued:
+    year: 2016
+- id: Wu2012camera
+  title: Camera- a competitive gene set test accounting for inter-gene correlation
+  author:
+  - family: Wu
+    given: Di
+  - family: Smyth
+    given: Gordon K
+  container-title: Nucleic Acids Research
+  volume: 40
+  page: e133
+  type: article-journal
+  issued:
+    year: 2012
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r edgeR-setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, dev = c("png", "pdf"))
+```
+
+# Introduction
+
+Here, we perform differential gene expression analysis with edgeR 
+[@Robinson2010edgeR] followed by gene set analysis with camera [@Wu2012camera],
+based on abundance estimates from Salmon. For more detailed information of each
+step, please refer to the 
+[edgeR user guide](https://www.bioconductor.org/packages/release/bioc/vignettes/edgeR/inst/doc/edgeRUsersGuide.pdf).
+
+# Load packages
+
+```{r edgeR-load-pkg}
+suppressPackageStartupMessages({
+    library(dplyr)
+    library(tximport)
+    library(tximeta)
+    library(SingleCellExperiment)
+    library(edgeR)
+    library(ggplot2)
+    library(msigdbr)
+})
+```
+
+# Load `SummarizedExperiment` object
+
+We load the `SummarizedExperiment` objects prepared using `tximeta`, containing
+gene- and transcript-level counts and feature lengths. In this report, we will
+use the gene-level quantifications.
+
+```{r edgeR-print-se}
+## List of SummarizedExperiment objects (gene/transcript level)
+se
+
+## Get gene-level SummarizedExperiment object
+sg <- se$sg
+if ("shortname" %in% colnames(colData(sg))) {
+    colnames(sg) <- sg$shortname
+}
+
+sg
+```
+
+# Plot total number of reads per sample
+
+```{r edgeR-plot-totalcount, fig.width = 8, fig.height = 6}
+ggplot(data.frame(totCount = colSums(assay(sg, "counts")), 
+                  sample = sg$shortname,
+                  sgroup = sg$sgroup,
+                  stringsAsFactors = FALSE), 
+       aes(x = sample, y = totCount, fill = sgroup)) + geom_bar(stat = "identity") + 
+    theme_bw() + xlab("") + ylab("Total read count") + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + 
+    scale_fill_manual(
+        name = "", 
+        values = c(HMLE_d8_ctrl = "#CEDDF5", HMLE_d8_4OHT = "#3471D1",
+                   HMLE_d12_ctrl = "#CEDDF5", HMLE_d12_4OHT = "#3471D1",
+                   HTER_d8_ctrl = "#F2C4D0", HTER_d8_4OHT_E = "#DB6987",
+                   HTER_d8_4OHT_EM = "#B53858", HTER_d8_4OHT_M = "#36010E",
+                   HTER_d12_ctrl = "#F2C4D0", HTER_d12_4OHT_E = "#DB6987",
+                   HTER_d12_4OHT_EM = "#B53858", HTER_d12_4OHT_M = "#36010E")
+    )
+```
+
+# Create DGEList and include average transcript length offsets
+
+In order to perform differential gene expression analysis with `edgeR`, we need to 
+represent out data as a `DGEList` object. We generate this from the `SummarizedExperiment` 
+object above, and include average transcript length offsets as described in @Soneson2016tximport.
+
+```{r edgeR-dge-generate}
+dge0 <- tximeta::makeDGEList(sg)
+
+stopifnot(colnames(sg) == rownames(dge0$samples),
+          rownames(sg) == rownames(dge0))
+dge0$genes <- as.data.frame(rowRanges(sg))
+dge0$samples <- cbind(dge0$samples, colData(sg))
+```
+
+# Calculate logCPMs and add as an assay
+
+We calculate log-counts per million (CPMs) from the counts, since the former are 
+useful descriptive measures for the expression level of a gene. Note, however, 
+that the normalized values are not used for the differential expression 
+analysis. 
+
+```{r edgeR-add-logcpm}
+# Here we use the approach from csaw::calculateCPM(), in order to account for
+# the average transcript length offsets in the CPM calculations
+off.mat <- dge0$offset
+new.offset <- edgeR::scaleOffset(dge0$samples$lib.size, off.mat)
+
+ap <- edgeR::addPriorCount(dge0$counts, offset = new.offset, prior.count = 2)
+logcpms <- log2(ap$y) - as.matrix(ap$offset)/log(2) + log2(1e6)
+dimnames(logcpms) <- dimnames(dge0$counts)
+
+stopifnot(rownames(logcpms) == rownames(sg),
+          colnames(logcpms) == colnames(sg))
+assay(sg, "logcpm") <- logcpms
+```
+
+# Define design. 
+
+Next, we specify the design matrix of the experiment, defining which sample 
+annotations will be taken into account in the statistical modeling.
+
+```{r edgeR-define-design}
+print(dge0$samples)
+print(design)
+
+(des <- model.matrix(as.formula(design), data = dge0$samples))
+colSums(des)
+```
+
+# Filter out lowly expressed genes
+
+Next we determine which genes have sufficiently large counts to be retained in
+the statistical analysis, and remove the rest. 
+
+```{r edgeR-filter-genes}
+dim(dge0)
+keep <- edgeR::filterByExpr(dge0, design = des)
+dge <- dge0[keep, ]
+dim(dge)
+```
+
+# Estimate dispersion and fit QL model
+
+We model the count data using a quasi-likelihood (QL) negative binomial (NB)
+generalized log-linear model, which accounts for gene-specific variability from
+both biological and technical sources. Before fitting the model, we estimate
+the NB dispersion (overall biological variability across all genes), and the QL
+dispersion (gene-specific) using the `estimateDisp()` function.
+
+It is also good practice to look at the relationship between the biological
+coefficient of variation (NB dispersion) and the gene abundance.
+
+```{r edgeR-estimate-disp}
+## Estimate dispersion and fit model
+dge <- estimateDisp(dge, design = des)
+qlfit <- glmQLFit(dge, design = des)
+
+## Plot dispersions
+plotBCV(dge)
+```
+
+# Exploratory analysis
+
+To get a first impression of the data, before performing differential expression analysis, 
+we apply multidimensional scaling (MDS) to generate a low-dimensional embedding of the 
+samples. 
+
+```{r edgeR-plotMDS}
+mds <- limma::plotMDS(dge, plot = FALSE)
+stopifnot(rownames(mds$cmdscale.out) == colnames(sg))
+reducedDim(sg, "MDS") <- mds$cmdscale.out
+
+ggplot(cbind(as.data.frame(mds$cmdscale.out), dge$samples) %>%
+           dplyr::mutate(sgroup = factor(sgroup, levels = c(
+               "HMLE_d8_ctrl", "HMLE_d8_4OHT", "HMLE_d12_ctrl", 
+               "HMLE_d12_4OHT", "HTER_d8_ctrl", "HTER_d8_4OHT_E",
+               "HTER_d8_4OHT_EM", "HTER_d8_4OHT_M", "HTER_d12_ctrl",
+               "HTER_d12_4OHT_E", "HTER_d12_4OHT_EM", "HTER_d12_4OHT_M"
+           ))), 
+       aes(x = V1, y = V2, color = sgroup, shape = sgroup)) + 
+    geom_point(size = 4) + 
+    labs(x = paste(mds$axislabel, mds$dim.plot[1]),
+         y = paste(mds$axislabel, mds$dim.plot[2])) + 
+    theme_bw() + 
+    scale_color_manual(
+        name = "", 
+        values = c(HMLE_d8_ctrl = "#CEDDF5", HMLE_d8_4OHT = "#3471D1",
+                   HMLE_d12_ctrl = "#CEDDF5", HMLE_d12_4OHT = "#3471D1",
+                   HTER_d8_ctrl = "#F2C4D0", HTER_d8_4OHT_E = "#DB6987",
+                   HTER_d8_4OHT_EM = "#B53858", HTER_d8_4OHT_M = "#36010E",
+                   HTER_d12_ctrl = "#F2C4D0", HTER_d12_4OHT_E = "#DB6987",
+                   HTER_d12_4OHT_EM = "#B53858", HTER_d12_4OHT_M = "#36010E")
+    ) + 
+    scale_shape_manual(
+        name = "",
+        values = c(HMLE_d8_ctrl = 17, HMLE_d8_4OHT = 17,
+                   HMLE_d12_ctrl = 19, HMLE_d12_4OHT = 19,
+                   HTER_d8_ctrl = 17, HTER_d8_4OHT_E = 17,
+                   HTER_d8_4OHT_M = 17, HTER_d8_4OHT_EM = 17,
+                   HTER_d12_ctrl = 19, HTER_d12_4OHT_E = 19,
+                   HTER_d12_4OHT_M = 19, HTER_d12_4OHT_EM = 19)
+    )
+```
+
+
+# Define contrasts 
+
+Before testing for differences in gene expression, we define the contrasts
+we wish to test for. Here we represent the constrasts as a numeric matrix:
+
+```{r edgeR-define-contrasts}
+print(contrast)
+(contrasts <- as.data.frame(makeContrasts(contrasts = contrast, levels = des)))
+```
+
+# Perform DGE tests
+
+Now we perform genewise tests for every contrast defined above, and save the
+results for every contrast. We are not interested in small changes (absolute 
+log-fold change below log2(3)), and thus we test against the null hypothesis that 
+the log-fold change between the compared groups is less than log2(3), using the 
+TREAT approach implemented in edgeR. 
+
+```{r edgeR-perform-tests}
+signif3 <- function(x) signif(x, digits = 3)
+edgeR_res <- lapply(contrasts, function(cm) {
+    qlf <- edgeR::glmTreat(qlfit, contrast = cm, lfc = log2(3))
+    tt <- edgeR::topTags(qlf, n = Inf, sort.by = "none")$table
+    tt %>%
+        dplyr::mutate(mlog10PValue = -log10(PValue)) %>% 
+        dplyr::mutate_if(is.numeric, signif3)
+})
+```
+
+# Make MA plots
+
+We can visualize the test results by plotting the logCPM (average) vs the logFC,
+and coloring genes with an adjusted p-value below 0.05. A plot is drawn for every contrast.
+
+```{r edgeR-ma-plots}
+for (nm in names(edgeR_res)) {
+    print(ggplot(edgeR_res[[nm]], aes(x = logCPM, y = logFC, 
+                                      color = FDR <= 0.05, 
+                                      alpha = FDR <= 0.05)) + 
+              geom_point() + theme_bw() + 
+              scale_color_manual(values = c("TRUE" = "red", "FALSE" = "black")) +
+              scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.5)) + 
+              ggtitle(gsub("sgroup", "", nm)) + 
+              annotate("text", 
+                       y = max(edgeR_res[[nm]]$logFC), 
+                       x = max(edgeR_res[[nm]]$logCPM),
+                       label = sum(edgeR_res[[nm]]$FDR <= 0.05 & 
+                                       edgeR_res[[nm]]$logFC > 0), 
+                       hjust = 1) + 
+              annotate("text", 
+                       y = min(edgeR_res[[nm]]$logFC), 
+                       x = max(edgeR_res[[nm]]$logCPM),
+                       label = sum(edgeR_res[[nm]]$FDR <= 0.05 & 
+                                       edgeR_res[[nm]]$logFC < 0), 
+                       hjust = 1)
+    )
+}
+```
+
+# Make volcano plots
+
+We can further visualize the test results by plotting the logFC vs -log10(PValue),
+and coloring genes with an adjusted p-value below 0.05 (or another specificed
+FDR threshold). A plot is drawn for every contrast.
+
+```{r edgeR-volcano-plots}
+for (nm in names(edgeR_res)) {
+    print(ggplot(edgeR_res[[nm]], aes(x = logFC, y = mlog10PValue, 
+                                      color = FDR <= 0.05,
+                                      alpha = FDR <= 0.05)) + 
+              geom_point() + theme_bw() + 
+              scale_color_manual(values = c("TRUE" = "red", "FALSE" = "black")) + 
+              scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.5)) + 
+              ggtitle(gsub("sgroup", "", nm)) + 
+              ylab("-log10(p-value)") + 
+              annotate("text", 
+                       y = max(edgeR_res[[nm]]$mlog10PValue), 
+                       x = max(edgeR_res[[nm]]$logFC),
+                       label = sum(edgeR_res[[nm]]$FDR <= 0.05 & 
+                                       edgeR_res[[nm]]$logFC > 0), 
+                       hjust = 1) + 
+              annotate("text", 
+                       y = max(edgeR_res[[nm]]$mlog10PValue), 
+                       x = min(edgeR_res[[nm]]$logFC),
+                       label = sum(edgeR_res[[nm]]$FDR <= 0.05 & 
+                                       edgeR_res[[nm]]$logFC < 0), 
+                       hjust = 0)
+    )
+}
+```
+
+# Write DGE results to text files
+
+We export the results into text files that can be opened using any text editor.
+
+```{r edgeR-save-results}
+## Write results to text files and make MA plots
+for (nm in names(edgeR_res)) {
+    write.table(edgeR_res[[nm]] %>% dplyr::arrange(PValue), 
+                file = paste0("edgeR_dge_results_", nm, ".txt"), 
+                sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+}
+```
+
+# Output DGE results as list of `SingleCellExperiment` objects
+
+Here, we store the analysis results within the original data. The results are
+appended on the `rowData` of the original gene-level `SummarizedExperiment`
+object `sg`. For genes that were filtered out, `NA` values are used in the
+result columns. The updated `sg` could be fed to the R package `iSEE` to
+perform more exploratory and visual analysis.
+
+```{r edgeR-se}
+## add rows (NA) for genes that are filtered out (if any)
+edgeR_resA <- lapply(seq_along(edgeR_res), FUN = function(x) {
+    
+    ## All genes
+    geneA <- rowData(sg)$gene_id
+    
+    ## Genes that are not filtered out
+    resX <- edgeR_res[[x]]
+    resX <- resX %>% 
+        dplyr::select(contains(c("gene_id", "gene_name", "logFC", "logCPM", 
+                                 "F", "FDR", "PValue", "mlog10PValue"))) 
+    rownames(resX) <- resX$gene_id
+    
+    ## Genes that are filtered out 
+    geneO <- setdiff(geneA, resX$gene_id)
+    
+    ## results for all genes
+    if (length(geneO) > 0) {
+        ## create a data frame with values NA as the results of the genes that
+        ## are filtered out
+        matO <- matrix(NA, nrow = length(geneO),
+                       ncol = ncol(resX),
+                       dimnames = list(geneO, 
+                                       colnames(resX))) 
+        resO <- data.frame(matO)
+        resO$gene_id <- geneO
+        resO$gene_name <- rowData(sg)$gene_name[match(geneO, rowData(sg)$gene_id)]
+        
+        ## Combine the result tables 
+        resA <- resO %>%
+            dplyr::bind_rows(resX) %>%
+            dplyr::arrange(match(gene_id, geneA)) %>%
+            dplyr::mutate(contrast = names(edgeR_res)[[x]]) 
+    } else {
+        resA <- resX %>%
+            dplyr::arrange(match(gene_id, geneA)) %>%
+            dplyr::mutate(contrast = names(edgeR_res)[[x]]) 
+    }
+    
+    ## Use gene column as rownames
+    rownames(resA) <- paste(resA$gene_id, resA$gene_name, sep = "__")
+    
+    ## convert to DataFrame
+    resA <- S4Vectors::DataFrame(resA)
+    return(resA)
+})
+names(edgeR_resA) <- names(edgeR_res)
+
+## Put the result tables in rowData 
+for (i in seq_along(edgeR_resA)) {
+    nam <- names(edgeR_resA)[i]
+    namI <- paste("edgeR:", nam, sep = "")
+    stopifnot(all(rownames(sg) == rownames(edgeR_resA[[i]])))
+    rowData(sg)[[namI]] <- edgeR_resA[[i]] 
+}
+```
+
+The output is serialized to an .rds file.
+
+```{r edgeR-save-se}
+saveRDS(sg, file = "edgeR_dge.rds")
+```
+
+
+```{r check-gene_names-column, eval = !is.null(genesets), include = FALSE}
+if(!("gene_name" %in% colnames(rowData(sg)))) {
+    genesets <- NULL
+}
+```
+
+```{r camera-text1, echo = FALSE, results = 'asis', eval = !is.null(genesets)}
+cat("# Load gene sets 
+
+We will use `camera` to perform an enrichment analysis for a collection of 
+gene sets from the [mSigDB](http://software.broadinstitute.org/gsea/msigdb), 
+packaged in the `msigdbr` R package. Here, we load the gene set definitions 
+and select which ones to include in the analysis.")
+```
+
+```{r camera-load-genesets, eval = !is.null(genesets), include = !is.null(genesets)}
+## Retrieve gene sets and combine in a tibble
+m_df <- bind_rows(lapply(genesets, 
+                         function(x) msigdbr(species = organism, category = x)))
+```
+
+```{r camera-text2, echo= FALSE, results = 'asis', eval = !is.null(genesets)}
+cat("# Perform tests
+
+Next, we perform the gene set analysis. We consider only gene sets where the 
+number of genes shared with the data set is not too small and not too large. 
+`camera` is a competitive gene set test that accounts for correlations among 
+the genes within a gene set.")
+```
+
+```{r camera-filter-gene-sets, eval = !is.null(genesets), include = !is.null(genesets)}
+minSize <- 3
+maxSize <- 500
+
+## Get index for genes in each gene set in the DGEList
+indexList <- limma::ids2indices(
+    gene.sets = lapply(split(m_df, f = m_df$gs_name), function(w) w$gene_symbol),
+    identifiers = dge$genes$gene_name,
+    remove.empty = TRUE
+)
+
+## Filter out too small or too large gene sets
+gsSizes <- vapply(indexList, length, 0)
+indexList <- indexList[gsSizes >= minSize & gsSizes <= maxSize]
+```
+
+```{r camera-check-indexList-length, eval = !is.null(genesets), include = FALSE}
+## Check if the index list is empty after filtering
+if (length(indexList) == 0){
+  genesets <- NULL
+  empty <- TRUE
+} else {
+  empty <- FALSE
+}
+```
+
+```{r camera-print-empty-list-message, echo = FALSE, results = 'asis', eval = !is.null(genesets) && empty}
+cat("**NOTE:**
+The index list is empty after filtering and `camera` cannot be run. Either try 
+different gene categories, try different filtering parameters or disable the 
+gene set analysis in the `config.yaml` file by setting `run_camera: False`.")
+```
+
+
+
+```{r camera-perform-tests, eval = !is.null(genesets), include = !is.null(genesets)}
+camera_res <- lapply(contrasts, function(cm) {
+    camera(dge, index = indexList, design = des, contrast = cm, 
+           inter.gene.cor = NA)
+})
+```
+
+
+```{r camera-text3, echo = FALSE, results = 'asis', eval = !is.null(genesets)}
+cat("# Write gene set analysis results to text files
+
+The results from `camera` are written to a separate text file for each tested 
+contrast.")
+```
+
+```{r camera-save-results, eval = !is.null(genesets), include = !is.null(genesets)}
+## Write results to text files
+for (nm in names(camera_res)) {
+    write.table(camera_res[[nm]] %>% 
+                    tibble::rownames_to_column("GeneSet") %>%
+                    dplyr::arrange(PValue), 
+                file = paste0("camera_dge_results_", nm, ".txt"), 
+                sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
+}
+```
+
+```{r camera-text4, echo = FALSE, results = 'asis', eval = !is.null(genesets)}
+cat("The `camera` output, as well as the used gene sets, are saved to a file.")
+```
+
+```{r camera-save-se, eval = !is.null(genesets), include = !is.null(genesets)}
+geneSets <- lapply(indexList, function(i) dge$genes$gene_name[i])
+saveRDS(list(cameraRes = camera_res,
+             geneSets = geneSets), file = "camera_gsa.rds")
+```
+
+# Session info
+
+The analyses above were performed with the following package versions:
+
+```{r edgeR-session-info}
+sessionInfo()
+date()
+```
+
+# References
+

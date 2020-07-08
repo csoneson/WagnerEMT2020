@@ -1,0 +1,22 @@
+channels:
+- conda-forge
+- bioconda
+dependencies:
+- r-base=4.0.2
+- pandoc
+- r-dplyr=1.0.0
+- r-ggplot2=3.3.2
+- r-tidyr=1.1.0
+- r-remotes=2.1.1
+- bioconductor-limma=3.44.1
+- bioconductor-edger=3.30.0
+- bioconductor-s4vectors=0.26.0
+- bioconductor-drimseq=1.16.0
+- bioconductor-singlecellexperiment=1.10.1
+- bioconductor-tximport=1.16.0
+- bioconductor-tximeta=1.6.2
+- r-msigdbr=7.1.1
+- bioconductor-org.hs.eg.db=3.11.4
+- r-BiocManager=1.30.10
+- r-rmarkdown=2.3
+- r-knitr=1.29
