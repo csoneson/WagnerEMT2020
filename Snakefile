@@ -80,7 +80,7 @@ rule pkginstall:
 	input:
 		script = "scripts/install_pkgs.R"
 	output:
-	  outputdir + "Rout/pkginstall_state.txt"
+		outputdir + "Rout/pkginstall_state.txt"
 	params:
 		flag = config["annotation"],
 		ncores = config["ncores"],
@@ -92,7 +92,7 @@ rule pkginstall:
 	log:
 		outputdir + "Rout/install_pkgs.Rout"
 	benchmark:
-	  outputdir + "benchmarks/install_pkgs.txt"
+		outputdir + "benchmarks/install_pkgs.txt"
 	shell:
 		'''{Rbin} CMD BATCH --no-restore --no-save "--args outtxt='{output}' ncores='{params.ncores}' annotation='{params.flag}' organism='{params.organism}'" {input.script} {log}'''
 
@@ -300,6 +300,25 @@ rule multiqc:
 		"echo 'MultiQC version:\n' > {log}; multiqc --version >> {log}; "
 		"multiqc {params.inputdirs} -f -o {params.MultiQCdir}"
 
+# Summary QC plots
+rule qcsummary:
+	input:
+		outputdir + "MultiQC/multiqc_report.html",
+		script = "scripts/summarize_qc.R",
+		metatxt = config["metatxt"]
+	output:
+		outputdir + "outputR/qc_summary.rds"
+	log:
+		outputdir + "Rout/summarize_qc.Rout"
+	benchmark:
+		outputdir + "benchmarks/summarize_qc.txt"
+	params:
+		multiqcdir = outputdir + "MultiQC",
+		fastqcdir = outputdir + "FastQC"
+	conda:
+		Renv
+	shell:
+		'''{Rbin} CMD BATCH --no-restore --no-save "--args metafile='{input.metatxt}' multiqcdir='{params.multiqcdir}' fastqcdir='{params.fastqcdir}' outrds='{output}'" {input.script} {log}'''
 
 ## ------------------------------------------------------------------------------------ ##
 ## Adapter trimming

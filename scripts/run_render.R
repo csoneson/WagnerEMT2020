@@ -44,7 +44,7 @@ if (exists("gtffile")) {
 
 if (exists("ncores")) {
     ncores <- as.numeric(ncores)
-    if(is.na(ncores))
+    if (is.na(ncores))
         ncores <- 1
     print(ncores)
 } else {

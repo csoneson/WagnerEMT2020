@@ -249,9 +249,9 @@ ggplot(cbind(as.data.frame(mds$cmdscale.out), dge$samples) %>%
         name = "", 
         values = c(HMLE_d8_ctrl = "#CEDDF5", HMLE_d8_4OHT = "#3471D1",
                    HMLE_d12_ctrl = "#CEDDF5", HMLE_d12_4OHT = "#3471D1",
-                   HTER_d8_ctrl = "#F2C4D0", HTER_d8_4OHT_E = "#DB6987",
+                   HTER_d8_ctrl = "#F2C4D0", HTER_d8_4OHT_E = "#ED829F",
                    HTER_d8_4OHT_EM = "#B53858", HTER_d8_4OHT_M = "#36010E",
-                   HTER_d12_ctrl = "#F2C4D0", HTER_d12_4OHT_E = "#DB6987",
+                   HTER_d12_ctrl = "#F2C4D0", HTER_d12_4OHT_E = "#ED829F",
                    HTER_d12_4OHT_EM = "#B53858", HTER_d12_4OHT_M = "#36010E")
     ) + 
     scale_shape_manual(
@@ -280,14 +280,14 @@ print(contrast)
 
 Now we perform genewise tests for every contrast defined above, and save the
 results for every contrast. We are not interested in small changes (absolute 
-log-fold change below log2(3)), and thus we test against the null hypothesis that 
-the log-fold change between the compared groups is less than log2(3), using the 
+log-fold change below log2(2)), and thus we test against the null hypothesis that 
+the log-fold change between the compared groups is less than log2(2), using the 
 TREAT approach implemented in edgeR. 
 
 ```{r edgeR-perform-tests}
 signif3 <- function(x) signif(x, digits = 3)
 edgeR_res <- lapply(contrasts, function(cm) {
-    qlf <- edgeR::glmTreat(qlfit, contrast = cm, lfc = log2(3))
+    qlf <- edgeR::glmTreat(qlfit, contrast = cm, lfc = log2(2))
     tt <- edgeR::topTags(qlf, n = Inf, sort.by = "none")$table
     tt %>%
         dplyr::mutate(mlog10PValue = -log10(PValue)) %>% 

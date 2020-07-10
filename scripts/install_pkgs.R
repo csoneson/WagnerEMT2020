@@ -22,8 +22,8 @@ usePackage <- function(pkgs) {
     
     ## Check that Bioc is new enough
     if (BiocManager::version() < '3.11') {
-      stop("Bioconductor release 3.11 or newer is required ", 
-           "for this version of ARMOR.")
+        stop("Bioconductor release 3.11 or newer is required ", 
+             "for this version of ARMOR.")
     }
     
     ## Install the other packages
@@ -63,14 +63,14 @@ pkgs.use <- c("dplyr", "ggplot2", "tidyr", "remotes", "limma", "edgeR",
 
 
 if (annotation == "Gencode") {
-  if (organism == "Homo_sapiens") {
-    pkgs.extra = "org.Hs.eg.db"
-  } else {
-    pkgs.extra = "org.Mm.eg.db"
-  }
-  pkgs.use <- c(pkgs.use, pkgs.extra)
+    if (organism == "Homo_sapiens") {
+        pkgs.extra = "org.Hs.eg.db"
+    } else {
+        pkgs.extra = "org.Mm.eg.db"
+    }
+    pkgs.use <- c(pkgs.use, pkgs.extra)
 }
-  
+
 
 usePackage(pkgs = pkgs.use)
 

@@ -20,3 +20,5 @@ dependencies:
 - r-BiocManager=1.30.10
 - r-rmarkdown=2.3
 - r-knitr=1.29
+- r-fastqcr=0.1.2
+- r-cowplot=1.0.0

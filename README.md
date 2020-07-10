@@ -10,7 +10,7 @@ The workflow structure is based on [`ARMOR`](https://github.com/csoneson/armor) 
 
 #### Download the data
 
-The FASTQ files have been uploaded to ArrayExpress, with accession number XXX. Download these 32 files, and place them in a subfolder named `FASTQ`.
+The FASTQ files have been uploaded to ArrayExpress, with accession number XXX. Download the 32 FASTQ files, and place them in a subfolder named `FASTQ`.
 
 #### Download the reference files
 
@@ -25,7 +25,13 @@ The analysis was performed using the Gencode v34 reference. Download the followi
 To run the workflow, first set up the conda environments:
 
 ```
-snakemake --use-conda setup
+snakemake --use-conda setup --cores 1
+```
+
+Check that all inputs are correctly specified:
+
+```
+snakemake --use-conda checkinputs --cores 1
 ```
 
 Then you can run the workflow as follows:
