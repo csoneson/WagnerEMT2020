@@ -2,7 +2,7 @@
 
 This repository contains the workflow for analyzing the RNA-seq data in 
 
-* Wagner _et al_ (2020): 
+* Wagner _et al_ (2020): Mass Cytometric and Transcriptomic Profiling of Epithelial-Mesenchymal Transitions in Human Mammary Cell Lines
 
 The workflow structure is based on [`ARMOR`](https://github.com/csoneson/armor) ([Orjuela, Huang, Hembach _et al_, 2019](https://www.g3journal.org/content/9/7/2089.long)). To run the workflow and regenerate the results, follow the instructions below.
 
@@ -10,7 +10,7 @@ The workflow structure is based on [`ARMOR`](https://github.com/csoneson/armor) 
 
 #### Download the data
 
-The FASTQ files have been uploaded to ArrayExpress, with accession number XXX. Download the 32 FASTQ files, and place them in a subfolder named `FASTQ`.
+The FASTQ files have been uploaded to ArrayExpress, with accession number E-MTAB-9365. Download the 32 FASTQ files, and place them in a subfolder named `FASTQ`.
 
 #### Download the reference files
 
