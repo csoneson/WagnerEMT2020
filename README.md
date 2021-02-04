@@ -16,11 +16,9 @@ The FASTQ files have been uploaded to ArrayExpress, with accession number [E-MTA
 
 The analysis was performed using the Gencode v34 reference. Download the following files, unzip them, and place them in a subfolder named `reference_files`:
 
-[genome](ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/GRCh38.primary_assembly.genome.fa.gz)
-
-[transcriptome](ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/gencode.v34.transcripts.fa.gz)
-
-[gtf file](ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz)
+* genome: `ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/GRCh38.primary_assembly.genome.fa.gz`
+* transcriptome: `ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/gencode.v34.transcripts.fa.gz`
+* gtf file: `ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz`
 
 #### Run the workflow
 
