@@ -1,8 +1,8 @@
-# Wagner et al 2020
+# Mass Cytometric and Transcriptomic Profiling of Epithelial-Mesenchymal Transitions in Human Mammary Cell Lines
 
 This repository contains the workflow for analyzing the RNA-seq data in 
 
-* Wagner _et al_ (2020): Mass Cytometric and Transcriptomic Profiling of Epithelial-Mesenchymal Transitions in Human Mammary Cell Lines
+* Wagner _et al_ (2021): Mass Cytometric and Transcriptomic Profiling of Epithelial-Mesenchymal Transitions in Human Mammary Cell Lines
 
 The workflow structure is based on [`ARMOR`](https://github.com/csoneson/armor) ([Orjuela, Huang, Hembach _et al_, 2019](https://www.g3journal.org/content/9/7/2089.long)). To run the workflow and regenerate the results, follow the instructions below.
 
@@ -22,7 +22,7 @@ The analysis was performed using the Gencode v34 reference. Download the followi
 
 #### Run the workflow
 
-To run the workflow, first set up the conda environments:
+To run the workflow, first make sure that `snakemake` is available. Then, set up the conda environments:
 
 ```
 snakemake --use-conda setup --cores 1
@@ -34,7 +34,7 @@ Check that all inputs are correctly specified:
 snakemake --use-conda checkinputs --cores 1
 ```
 
-Then you can run the workflow as follows:
+Then you can run the full workflow as follows:
 
 ```
 snakemake --use-conda --cores 16
