@@ -68,7 +68,8 @@ Rbin = config["Rbin"]
 rule all:
 	input:
 		outputdir + "MultiQC/multiqc_report.html",
-		outputdir + "outputR/edgeR_dge.rds"
+		outputdir + "outputR/edgeR_dge.rds",
+		outputdir + "outputR/qc_summary.rds"
 
 rule setup:
 	input:

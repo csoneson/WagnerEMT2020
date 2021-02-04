@@ -27,6 +27,9 @@ grl <- read.delim(file.path(multiqcdir, "multiqc_data/multiqc_general_stats.txt"
                   `STAR, percent uniquely mapped` = 
                       STAR_mqc.generalstats.star.uniquely_mapped_percent)
 
+write.table(grl, file = gsub("\\.rds$", "_mapping.summary.txt", outrds), 
+            row.names = FALSE, col.names = TRUE, sep = "\t", quote = FALSE)
+
 grp <- ggplot(grl %>% 
                   tidyr::gather(key = "method", value = "percentage", 
                                 -shortname, -sgroup) %>% 

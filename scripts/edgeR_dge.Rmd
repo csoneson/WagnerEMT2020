@@ -233,13 +233,19 @@ mds <- limma::plotMDS(dge, plot = FALSE)
 stopifnot(rownames(mds$cmdscale.out) == colnames(sg))
 reducedDim(sg, "MDS") <- mds$cmdscale.out
 
-ggplot(cbind(as.data.frame(mds$cmdscale.out), dge$samples) %>%
-           dplyr::mutate(sgroup = factor(sgroup, levels = c(
-               "HMLE_d8_ctrl", "HMLE_d8_4OHT", "HMLE_d12_ctrl", 
-               "HMLE_d12_4OHT", "HTER_d8_ctrl", "HTER_d8_4OHT_E",
-               "HTER_d8_4OHT_EM", "HTER_d8_4OHT_M", "HTER_d12_ctrl",
-               "HTER_d12_4OHT_E", "HTER_d12_4OHT_EM", "HTER_d12_4OHT_M"
-           ))), 
+plotdf <- cbind(as.data.frame(mds$cmdscale.out), dge$samples) %>%
+    dplyr::mutate(grp = factor(gsub("_d8|_d12", "", sgroup),
+                               levels = c(
+                                   "HMLE_ctrl", "HMLE_4OHT", "HTER_ctrl",
+                                   "HTER_4OHT_E", "HTER_4OHT_EM", "HTER_4OHT_M"
+                               ))) %>%
+    dplyr::mutate(sgroup = factor(sgroup, levels = c(
+        "HMLE_d8_ctrl", "HMLE_d8_4OHT", "HMLE_d12_ctrl", 
+        "HMLE_d12_4OHT", "HTER_d8_ctrl", "HTER_d8_4OHT_E",
+        "HTER_d8_4OHT_EM", "HTER_d8_4OHT_M", "HTER_d12_ctrl",
+        "HTER_d12_4OHT_E", "HTER_d12_4OHT_EM", "HTER_d12_4OHT_M"
+    )))
+ggplot(plotdf, 
        aes(x = V1, y = V2, color = sgroup, shape = sgroup)) + 
     geom_point(size = 4) + 
     labs(x = paste(mds$axislabel, mds$dim.plot[1]),
@@ -262,6 +268,23 @@ ggplot(cbind(as.data.frame(mds$cmdscale.out), dge$samples) %>%
                    HTER_d8_4OHT_M = 17, HTER_d8_4OHT_EM = 17,
                    HTER_d12_ctrl = 19, HTER_d12_4OHT_E = 19,
                    HTER_d12_4OHT_M = 19, HTER_d12_4OHT_EM = 19)
+    )
+
+ggplot(plotdf, 
+       aes(x = V1, y = V2, color = grp, shape = time)) + 
+    geom_point(size = 4) + 
+    labs(x = paste(mds$axislabel, mds$dim.plot[1]),
+         y = paste(mds$axislabel, mds$dim.plot[2])) + 
+    theme_bw() + 
+    scale_color_manual(
+        name = "", 
+        values = c(HMLE_ctrl = "#CEDDF5", HMLE_4OHT = "#3471D1",
+                   HTER_ctrl = "#F2C4D0", HTER_4OHT_E = "#ED829F",
+                   HTER_4OHT_EM = "#B53858", HTER_4OHT_M = "#36010E")
+    ) + 
+    scale_shape_manual(
+        name = "",
+        values = c(d8 = 17, d12 = 19)
     )
 ```
 
