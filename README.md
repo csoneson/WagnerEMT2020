@@ -10,7 +10,7 @@ The workflow structure is based on [`ARMOR`](https://github.com/csoneson/armor) 
 
 #### Download the data
 
-The FASTQ files have been uploaded to ArrayExpress, with accession number E-MTAB-9365. Download the 32 FASTQ files, and place them in a subfolder named `FASTQ`.
+The FASTQ files have been uploaded to ArrayExpress, with accession number [E-MTAB-9365](https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-9365/). Download the 32 FASTQ files, and place them in a subfolder named `FASTQ`.
 
 #### Download the reference files
 
